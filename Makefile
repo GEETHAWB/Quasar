@@ -1,20 +1,59 @@
-.PHONY: configure build run clean format format-check
+PROJECT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 
-configure:
-	cmake --preset ninja-debug
+CXX := g++
+CMAKE := cmake 
+BUILD_ROOT := $(PROJECT_DIR)/build
+TARGET := Quasar
 
-build: configure
-	cmake --build --preset build-ninja-debug
+MODE ?= debug
 
-run: build
+ifeq ($(MODE),release)
+	BUILD_DIR := $(BUILD_ROOT)/release
+	BUILD_TYPE := Release
+	DEBUG_MODE := OFF
+else ifeq ($(MODE),debug)
+	BUILD_DIR := $(BUILD_ROOT)/debug
+	BUILD_TYPE := Debug
+	DEBUG_MODE := ON 
+else
+	$(error Invalid MODE '$(MODE)'. Use release or debug)
+endif
+
+.PHONY: all build run debug clean
+
+all: build
+
+# Build Release
+build:
+	$(MAKE) --no-print-directory _build MODE=release
+
+# Build Debug
+debug:
+	$(MAKE) --no-print-directory _build MODE=debug
+
+run:
+	$(MAKE) --no-print-directory _run MODE=$(MODE)
+
+# Shortcuts
+run-r:
+	$(MAKE) --no-print-directory _run MODE=release
+
+run-d:
+	$(MAKE) --no-print-directory _run MODE=debug
+
+# Internal targets
+
+_build:
+	$(CMAKE) -S "$(PROJECT_DIR)" -B $(BUILD_DIR) \
+		-G Ninja \
+		-DCMAKE_CXX_COMPILER=$(CXX) \
+		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+		-DDEBUG_MODE=$(DEBUG_MODE)
+	$(CMAKE) --build $(BUILD_DIR) --parallel
+
+_run: _build
 	clear
-	./build/ninja-debug/Quasar
+	"$(BUILD_DIR)/$(TARGET)"
 
 clean:
-	cmake --build build/ninja-debug --target clean
-
-format:
-	cmake --build build/ninja-debug --target format
-
-format-check:
-	cmake --build build/ninja-debug --target format-check
+	$(CMAKE) -E rm -rf $(BUILD_ROOT)

@@ -1,1 +1,6 @@
 build/
+.clang-format
+.vscode
+.clangd
+.gitignore
+.cache

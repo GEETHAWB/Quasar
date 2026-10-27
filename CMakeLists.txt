@@ -10,24 +10,15 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_program(CLANG_FORMAT_EXECUTABLE NAMES clang-format REQUIRED)
-
 # Dependencies
 include(FetchContent)
 
 find_package(Vulkan REQUIRED)
 find_package(SDL2 REQUIRED)
 
-FetchContent_Declare(
-    volk
-    GIT_REPOSITORY https://github.com/zeux/volk.git
-    GIT_TAG        1.4.304
-    GIT_SHALLOW    TRUE
-)
- 
 set(GLM_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLM_BUILD_INSTALL OFF CACHE BOOL "" FORCE)
- 
+
 FetchContent_Declare(
     glm
     GIT_REPOSITORY https://github.com/g-truc/glm.git
@@ -42,24 +33,37 @@ FetchContent_Declare(
     GIT_SHALLOW    TRUE
 )
  
-FetchContent_MakeAvailable(volk glm VulkanMemoryAllocator)
+FetchContent_MakeAvailable(glm VulkanMemoryAllocator)
 
-set(QUASAR_SOURCES src/main.cpp)
+set(SRC_DIR "${CMAKE_SOURCE_DIR}/src")
+file(GLOB_RECURSE SOURCES 
+    CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cc"    
+)
 
-add_executable(${PROJECT_NAME} ${QUASAR_SOURCES})
+option(DEBUG_MODE "Enable additional debug output" OFF)
 
-target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
+add_executable(${PROJECT_NAME} ${SOURCES})
+
+target_include_directories(Quasar PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/inc"
+)
+
+if (DEBUG_MODE)
+    target_compile_definitions(Quasar PRIVATE DEBUG_MODE=1)
+endif()
+
+target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_26)
  
 target_link_libraries(${PROJECT_NAME} PRIVATE
     Vulkan::Headers
-    volk
     glm::glm
     GPUOpen::VulkanMemoryAllocator
     SDL2::SDL2
     SDL2::SDL2main
 )
  
-# volk dynamically resolves Vulkan entry points itself
+# Use Vulkan's dynamic dipatch instead of Vulkan function prototypes
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     VK_NO_PROTOTYPES
 )
