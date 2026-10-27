@@ -1,4 +1,3 @@
-#define VOLK_IMPLEMENTATION
 #include <iostream>
 #include <volk.h>
 
