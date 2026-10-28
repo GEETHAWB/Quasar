@@ -6,7 +6,7 @@ auto main() -> int {
     try {
         qsr::Engine engine;
     } catch (const std::exception& e) {
-        std::println("[Quasar] Initialization Failed: {}", e.what());
+        std::println("Initialization Failed: {}", e.what());
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;

@@ -1,19 +1,17 @@
 #pragma once
 
-#include <vulkan/vulkan.hpp>
-#include <vulkan/vulkan_raii.hpp>
+#include "ve/renderer.hh"
+#include "window.hh"
 
 namespace qsr {
 
 class Engine final {
   public:
-    Engine() { createInstance(); }
+    Engine() {}
 
   private:
-    auto createInstance() -> void;
-
-    vk::raii::Context context_{};
-    vk::raii::Instance instance_{nullptr};
+    sdl::Window window_{"Quasar", 1280, 720};
+    ve::Renderer renderer_{window_};
 };
 
 }; // namespace qsr

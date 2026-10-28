@@ -30,4 +30,4 @@ using f64 = double;
 // Other standard types
 using byte = std::byte;
 
-} // namespace qsr
+}; // namespace qsr
