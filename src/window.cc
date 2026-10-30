@@ -1,4 +1,5 @@
 #include "window.hh"
+
 #include "helper.hh"
 #include "types.hh"
 
@@ -28,12 +29,10 @@ Window::Window(std::string_view title, int width, int height) {
 
     const std::string windowTitle{title};
 
-    window_ = SDL_CreateWindow(windowTitle.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                               width, height, flags);
+    window_ = SDL_CreateWindow(
+        windowTitle.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, flags);
 
-#ifdef DEBUG_MODE
     ::output("SDL Window Created", ::LogLevel::Info);
-#endif
 
     if (window_ == nullptr) {
         const std::string error = SDL_GetError();

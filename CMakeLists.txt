@@ -68,6 +68,25 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
     VK_NO_PROTOTYPES
 )
 
+target_compile_options(${PROJECT_NAME} PRIVATE
+        -Wall
+        -Wextra
+        -Wpedantic
+    )
+    
+# Debug-only options
+target_compile_options(${PROJECT_NAME} PRIVATE
+    "$<$<CONFIG:Debug>:-Wconversion>"
+    "$<$<CONFIG:Debug>:-Wshadow>"
+    "$<$<CONFIG:Debug>:-Og>"
+    "$<$<CONFIG:Debug>:-g3>"
+)
+
+# Release-only options
+target_compile_options(${PROJECT_NAME} PRIVATE
+    "$<$<CONFIG:Release>:-O3>"
+)
+
 set(QUASAR_FORMAT_SOURCES)
 foreach(source_file IN LISTS QUASAR_SOURCES)
     list(APPEND QUASAR_FORMAT_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/${source_file}")

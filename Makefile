@@ -1,7 +1,7 @@
 PROJECT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 
 CXX := g++
-CMAKE := cmake 
+CMAKE := cmake
 BUILD_ROOT := $(PROJECT_DIR)/build
 TARGET := Quasar
 
@@ -14,7 +14,7 @@ ifeq ($(MODE),release)
 else ifeq ($(MODE),debug)
 	BUILD_DIR := $(BUILD_ROOT)/debug
 	BUILD_TYPE := Debug
-	DEBUG_MODE := ON 
+	DEBUG_MODE := ON
 else
 	$(error Invalid MODE '$(MODE)'. Use release or debug)
 endif

@@ -17,22 +17,31 @@ struct QueueFamilyIndices final {
 };
 
 class Renderer final {
-  public:
-    explicit Renderer(sdl::Window& window) : window_{window} { init(); };
+public:
+    explicit Renderer(sdl::Window& window) : window_{window} {
+        init();
+    };
     ~Renderer() = default;
 
-  private:
+private:
     auto init() -> void;
     auto createInstance() -> void;
     auto createPhysicalDevice() -> void;
     auto createSurface() -> void;
     auto createQueueFamilies() -> void;
+    auto createDebugMessenger() -> void;
+    auto createLogicalDevice() -> void;
 
     const sdl::Window& window_;
     vk::raii::Context context_;
     vk::raii::Instance instance_{nullptr};
+    vk::raii::DebugUtilsMessengerEXT debugMessenger_{nullptr};
     vk::raii::SurfaceKHR surface_{nullptr};
     vk::raii::PhysicalDevice physicalDevice_{nullptr};
+    vk::raii::Device device_{nullptr};
+
+    vk::raii::Queue graphicsQueue_{nullptr};
+    vk::raii::Queue presentQueue_{nullptr};
 
     QueueFamilyIndices queueFamilyIndices_{};
 };

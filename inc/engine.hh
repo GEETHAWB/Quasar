@@ -6,10 +6,11 @@
 namespace qsr {
 
 class Engine final {
-  public:
-    Engine() {}
+public:
+    Engine() {
+    }
 
-  private:
+private:
     sdl::Window window_{"Quasar", 1280, 720};
     ve::Renderer renderer_{window_};
 };

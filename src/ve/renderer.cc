@@ -4,8 +4,9 @@ using namespace qsr::ve;
 
 auto Renderer::init() -> void {
     createInstance();
+    createDebugMessenger();
     createSurface();
     createPhysicalDevice();
     createQueueFamilies();
-    // TODO: Create logical device & debug messenger
+    createLogicalDevice();
 }

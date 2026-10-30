@@ -5,10 +5,12 @@
 #include <SDL_error.h>
 #include <SDL_vulkan.h>
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <exception>
+#include <set>
 #include <stdexcept>
-#include <vulkan/vulkan_core.h>
+#include <vector>
 
 using namespace qsr::ve;
 
@@ -18,14 +20,16 @@ namespace {
 [[nodiscard]] auto hasLayer(const std::vector<vk::LayerProperties>& availableLayers,
                             std::string_view name) -> bool {
     return std::any_of(
-        availableLayers.begin(), availableLayers.end(),
-        [name](const vk::LayerProperties& layer) { return name == layer.layerName; });
+        availableLayers.begin(), availableLayers.end(), [name](const vk::LayerProperties& layer) {
+            return name == layer.layerName;
+        });
 }
 
 // Check through available extensions for the desired one
 [[nodiscard]] auto hasExtension(const std::vector<vk::ExtensionProperties>& availableExtensions,
                                 std::string_view name) -> bool {
-    return std::any_of(availableExtensions.begin(), availableExtensions.end(),
+    return std::any_of(availableExtensions.begin(),
+                       availableExtensions.end(),
                        [name](const vk::ExtensionProperties& extension) {
                            return name == extension.extensionName;
                        });
@@ -34,8 +38,9 @@ namespace {
 // What tf does this do?
 auto appendUnique(std::vector<const char*>& extensions, const char* name) -> void {
     const bool alreadyPresent =
-        std::any_of(extensions.begin(), extensions.end(),
-                    [name](const char* existing) { return std::string_view{existing} == name; });
+        std::any_of(extensions.begin(), extensions.end(), [name](const char* existing) {
+            return std::string_view{existing} == name;
+        });
 
     if (!alreadyPresent)
         extensions.push_back(name);
@@ -44,11 +49,9 @@ auto appendUnique(std::vector<const char*>& extensions, const char* name) -> voi
 }; // namespace
 
 auto Renderer::createInstance() -> void {
-
-#ifdef DEBUG_MODE
-
     auto start = std::chrono::steady_clock::now();
 
+#ifdef DEBUG_MODE
     constexpr const char* validationLayerName = "VK_LAYER_KHRONOS_validation";
 
     const auto availableLayers = context_.enumerateInstanceLayerProperties();
@@ -76,8 +79,8 @@ auto Renderer::createInstance() -> void {
 
     std::vector<const char*> sdlExtensions(extensionCount);
 
-    if (SDL_Vulkan_GetInstanceExtensions(window_.nativeHandle(), &extensionCount,
-                                         sdlExtensions.data()) != SDL_TRUE) {
+    if (SDL_Vulkan_GetInstanceExtensions(
+            window_.nativeHandle(), &extensionCount, sdlExtensions.data()) != SDL_TRUE) {
         throw std::runtime_error(std::string{"Quasar: SDL extension retrieval failed: "} +
                                  SDL_GetError());
     }
@@ -123,20 +126,20 @@ auto Renderer::createInstance() -> void {
 
     vk::InstanceCreateInfo instanceCI{};
     instanceCI.pApplicationInfo = &appInfo;
+#ifdef DEBUG_MODE
     instanceCI.enabledLayerCount = static_cast<qsr::u32>(enabledLayers.size());
     instanceCI.ppEnabledLayerNames = enabledLayers.data();
+#endif
     instanceCI.enabledExtensionCount = static_cast<qsr::u32>(enabledExtensions.size());
     instanceCI.ppEnabledExtensionNames = enabledExtensions.data();
 
     // RAII functions automatically throw exceptions if things go wrong
     instance_ = vk::raii::Instance(context_, instanceCI);
 
-#ifdef DEBUG_MODE
     auto end = std::chrono::steady_clock::now();
     const auto msg =
         std::format("vkInstance created in {} ms", ::elapsed(start, end, ::Time::Millis));
     ::output(msg, ::LogLevel::Info);
-#endif
 }
 
 auto Renderer::createSurface() -> void {
@@ -148,16 +151,12 @@ auto Renderer::createSurface() -> void {
     VkSurfaceKHR rawSurface = VK_NULL_HANDLE;
 
     if (SDL_Vulkan_CreateSurface(nativeWindow, *instance_, &rawSurface) != SDL_TRUE) {
-        const char* const error = SDL_GetError();
-
         throw std::runtime_error("Quasar: SDL Vulkan surface creation failed");
     }
 
     surface_ = vk::raii::SurfaceKHR{instance_, rawSurface};
 
-#ifdef DEBUG_MODE
     ::output("Vulkan surface created successfully", ::LogLevel::Info);
-#endif
 }
 
 auto Renderer::createPhysicalDevice() -> void {
@@ -171,12 +170,10 @@ auto Renderer::createPhysicalDevice() -> void {
         // TODO: Once logical device is done, implement more complex scoring
         physicalDevice_ = std::move(devices.front());
 
-#ifdef DEBUG_MODE
         const auto props = physicalDevice_.getProperties();
         const auto msg =
             std::format("Selected physical device: {}", std::string_view{props.deviceName});
         ::output(msg, ::LogLevel::Info);
-#endif
     } catch (const vk::SystemError& e) {
         std::throw_with_nested(std::runtime_error{
             std::format("Quasar: Physical device creation failed: {}", e.what())});
@@ -219,7 +216,6 @@ auto Renderer::createQueueFamilies() -> void {
             throw std::runtime_error{
                 "Quasar: No suitable graphics and presentation queue families were found."};
 
-#ifdef DEBUG_MODE
         if (*indices.graphics == *indices.presentation) {
             ::output(std::format("Using queue family {} for graphics and presentation",
                                  *indices.graphics),
@@ -229,9 +225,75 @@ auto Renderer::createQueueFamilies() -> void {
             ::output(std::format("Presentation queue family: {}", *indices.presentation),
                      ::LogLevel::Info);
         }
-#endif
+
+        queueFamilyIndices_ = indices;
     } catch (const vk::SystemError& e) {
         std::throw_with_nested(
             std::runtime_error{std::format("Quasar: Queue family creation failed: {}", e.what())});
     }
+}
+
+auto Renderer::createLogicalDevice() -> void {
+    auto start = std::chrono::steady_clock::now();
+
+    const auto indices = queueFamilyIndices_;
+
+    if (!queueFamilyIndices_.isComplete()) {
+        throw std::runtime_error{
+            "Quasar: Logical device creation failed. Incomplete queue families"};
+    }
+
+    constexpr auto queuePriority = 1.0F;
+
+    // Deduplicate queue families if they're both the same
+    const std::set<qsr::u32> uniqueFamilies{indices.graphics.value(), indices.presentation.value()};
+
+    std::vector<vk::DeviceQueueCreateInfo> queueCIs{};
+    queueCIs.reserve(uniqueFamilies.size());
+
+    for (const qsr::u32 family : uniqueFamilies) {
+        vk::DeviceQueueCreateInfo queueCI{};
+        queueCI.queueFamilyIndex = family;
+        queueCI.queueCount = 1;
+        queueCI.pQueuePriorities = &queuePriority;
+
+        queueCIs.emplace_back(queueCI);
+    }
+
+    // Required device extensions
+    const std::array<const char*, 1> deviceExtensions{vk::KHRSwapchainExtensionName};
+
+    vk::PhysicalDeviceVulkan12Features vk12Features{};
+    vk12Features.descriptorIndexing = true;
+    vk12Features.shaderSampledImageArrayNonUniformIndexing = true;
+    vk12Features.descriptorBindingVariableDescriptorCount = true;
+    vk12Features.runtimeDescriptorArray = true;
+    vk12Features.bufferDeviceAddress = true;
+
+    vk::PhysicalDeviceVulkan13Features vk13Features{};
+    vk13Features.pNext = &vk12Features;
+    vk13Features.synchronization2 = true;
+    vk13Features.dynamicRendering = true;
+
+    vk::PhysicalDeviceFeatures vk10Features{};
+    vk10Features.samplerAnisotropy = vk::True;
+
+    vk::DeviceCreateInfo deviceCI{};
+    deviceCI.pNext = vk13Features;
+    deviceCI.queueCreateInfoCount = static_cast<qsr::u32>(queueCIs.size());
+    deviceCI.pQueueCreateInfos = queueCIs.data();
+    deviceCI.enabledExtensionCount = static_cast<qsr::u32>(deviceExtensions.size());
+    deviceCI.ppEnabledExtensionNames = deviceExtensions.data();
+    deviceCI.pEnabledFeatures = &vk10Features;
+
+    device_ = vk::raii::Device{physicalDevice_, deviceCI};
+
+    // Retrieve queues
+    graphicsQueue_ = vk::raii::Queue{device_, indices.graphics.value(), 0};
+    presentQueue_ = vk::raii::Queue{device_, indices.presentation.value(), 0};
+
+    auto end = std::chrono::steady_clock::now();
+    const auto msg =
+        std::format("Logical device created in {} ms", ::elapsed(start, end, ::Time::Millis));
+    ::output(msg, ::LogLevel::Info);
 }

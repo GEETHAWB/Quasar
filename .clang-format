@@ -1,8 +1,54 @@
+# =======================
+# Formatting for Quasar
+# =======================
+
 BasedOnStyle: LLVM
-Language: Cpp
-ColumnLimit: 100
+
+# General stuff
 IndentWidth: 4
 TabWidth: 4
+UseTab: Never
+ColumnLimit: 100
+MaxEmptyLinesToKeep: 1
+KeepEmptyLinesAtTheStartOfBlocks: false
+
+# Rust-like brace placement
+BreakBeforeBraces: Attach
+AllowShortBlocksOnASingleLine: Never
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortEnumsOnASingleLine: false
+AllowShortLambdasOnASingleLine: None
+
+# Prefer vertical layouts for longer function calls and declarations
+BinPackArguments: false
+BinPackParameters: false
+AlignAfterOpenBracket: Align
+
+# Pointer/reference declarations
+DerivePointerAlignment: false
 PointerAlignment: Left
-SortIncludes: CaseSensitive
-InsertNewlineAtEOF: true
+ReferenceAlignment: Left
+
+# Class layout
+AccessModifierOffset: -4
+IndentCaseLabels: true
+NamespaceIndentation: None
+
+# Lists and initializers
+Cpp11BracedListStyle: true
+SpaceBeforeCpp11BracedList: false
+
+# Keep operators with the preceding expression when wrapping
+BreakBeforeBinaryOperators: None
+
+# Include organization
+SortIncludes: true
+IncludeBlocks: Regroup
+
+# Whitespace
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+SpaceBeforeParens: ControlStatements
