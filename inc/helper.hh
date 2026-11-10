@@ -34,28 +34,39 @@ template <typename Clock, typename StartDuration, typename EndDuration>
     return 0.0;
 }
 
+// Can't not have swag when printing to the terminal
+constexpr std::string_view reset = "\033[0m";
+constexpr std::string_view cyan = "\033[36m";
+constexpr std::string_view green = "\033[32m";
+constexpr std::string_view yellow = "\033[33m";
+constexpr std::string_view red = "\033[31m";
+constexpr std::string_view gray = "\033[90m";
+
 enum class LogLevel {
     Info,
     Warn,
     Debug,
     Error,
+    Success,
 };
 
 inline auto output(std::string_view message, ::LogLevel level) -> void {
     // The super ugly \x1b stuff colors the text in the terminal output
     switch (level) {
         case ::LogLevel::Info:
-            std::println("[\x1b[32mINFO\x1b[0m] {}", message);
+            std::println("{}[INFO]{} {}", gray, reset, message);
             break;
         case ::LogLevel::Warn:
-            std::println("[\x1b[33mWARN\x1b[0m] {}", message);
+            std::println("{}[WARN]{} {}", yellow, reset, message);
             break;
         case ::LogLevel::Debug:
-            std::println("[\x1b[34mDEBUG\x1b[0m] {}", message);
+            std::println("{}[DEBG]{} {}", cyan, reset, message);
             break;
         case ::LogLevel::Error:
-            std::println("[\x1b[31mERROR\x1b[0m] {}", message);
+            std::println("{}[FAIL]{} {}", red, reset, message);
             break;
+        case ::LogLevel::Success:
+            std::println("{}[ OK ]{} {}", green, reset, message);
     }
 }
 

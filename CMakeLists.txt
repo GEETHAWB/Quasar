@@ -13,6 +13,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Dependencies
 include(FetchContent)
 
+add_subdirectory(shaderc)
+
 find_package(Vulkan REQUIRED)
 find_package(SDL2 REQUIRED)
 
@@ -36,6 +38,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(glm VulkanMemoryAllocator)
 
 set(SRC_DIR "${CMAKE_SOURCE_DIR}/src")
+
 file(GLOB_RECURSE SOURCES 
     CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cc"    
@@ -57,15 +60,11 @@ target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_26)
  
 target_link_libraries(${PROJECT_NAME} PRIVATE
     Vulkan::Headers
+    Vulkan::Vulkan
     glm::glm
     GPUOpen::VulkanMemoryAllocator
     SDL2::SDL2
     SDL2::SDL2main
-)
- 
-# Use Vulkan's dynamic dipatch instead of Vulkan function prototypes
-target_compile_definitions(${PROJECT_NAME} PRIVATE
-    VK_NO_PROTOTYPES
 )
 
 target_compile_options(${PROJECT_NAME} PRIVATE

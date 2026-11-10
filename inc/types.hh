@@ -30,4 +30,6 @@ using f64 = double;
 // Other standard types
 using byte = std::byte;
 
+static constexpr u32 framesInFlight = 2;
+
 }; // namespace qsr

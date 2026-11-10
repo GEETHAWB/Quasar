@@ -54,7 +54,7 @@ auto Renderer::createInstance() -> void {
 #ifdef DEBUG_MODE
     constexpr const char* validationLayerName = "VK_LAYER_KHRONOS_validation";
 
-    const auto availableLayers = context_.enumerateInstanceLayerProperties();
+    const auto availableLayers = this->context_.enumerateInstanceLayerProperties();
 
     std::vector<const char*> enabledLayers;
 
@@ -71,7 +71,7 @@ auto Renderer::createInstance() -> void {
 
     qsr::u32 extensionCount = 0;
 
-    if (SDL_Vulkan_GetInstanceExtensions(window_.nativeHandle(), &extensionCount, nullptr) !=
+    if (SDL_Vulkan_GetInstanceExtensions(this->window_.nativeHandle(), &extensionCount, nullptr) !=
         SDL_TRUE) {
         throw std::runtime_error(std::string{"Quasar: SDL extension query failed: "} +
                                  SDL_GetError());
@@ -80,12 +80,12 @@ auto Renderer::createInstance() -> void {
     std::vector<const char*> sdlExtensions(extensionCount);
 
     if (SDL_Vulkan_GetInstanceExtensions(
-            window_.nativeHandle(), &extensionCount, sdlExtensions.data()) != SDL_TRUE) {
+            this->window_.nativeHandle(), &extensionCount, sdlExtensions.data()) != SDL_TRUE) {
         throw std::runtime_error(std::string{"Quasar: SDL extension retrieval failed: "} +
                                  SDL_GetError());
     }
 
-    const auto availableExtensions = context_.enumerateInstanceExtensionProperties();
+    const auto availableExtensions = this->context_.enumerateInstanceExtensionProperties();
 
     std::vector<const char*> enabledExtensions;
 
@@ -106,13 +106,13 @@ auto Renderer::createInstance() -> void {
     ::appendUnique(enabledExtensions, VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 #endif
 
-    const qsr::u32 availableVersion = context_.enumerateInstanceVersion();
+    this->apiVersion_ = this->context_.enumerateInstanceVersion();
 
-    if (availableVersion < VK_API_VERSION_1_4) {
+    if (this->apiVersion_ < VK_API_VERSION_1_4) {
         const auto msg = std::format("Vulkan Version {}.{} detected. Vulkan 1.4 is preferred."
                                      "Some features may not work properly.",
-                                     VK_API_VERSION_MAJOR(availableVersion),
-                                     VK_API_VERSION_MINOR(availableVersion));
+                                     VK_API_VERSION_MAJOR(this->apiVersion_),
+                                     VK_API_VERSION_MINOR(this->apiVersion_));
         ::output(msg, ::LogLevel::Warn);
     }
 
@@ -122,7 +122,7 @@ auto Renderer::createInstance() -> void {
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.pEngineName = "QuasarEngine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_4;
+    appInfo.apiVersion = this->apiVersion_;
 
     vk::InstanceCreateInfo instanceCI{};
     instanceCI.pApplicationInfo = &appInfo;
@@ -134,7 +134,7 @@ auto Renderer::createInstance() -> void {
     instanceCI.ppEnabledExtensionNames = enabledExtensions.data();
 
     // RAII functions automatically throw exceptions if things go wrong
-    instance_ = vk::raii::Instance(context_, instanceCI);
+    this->instance_ = vk::raii::Instance(this->context_, instanceCI);
 
     auto end = std::chrono::steady_clock::now();
     const auto msg =
@@ -143,7 +143,7 @@ auto Renderer::createInstance() -> void {
 }
 
 auto Renderer::createSurface() -> void {
-    const auto nativeWindow = window_.nativeHandle();
+    const auto nativeWindow = this->window_.nativeHandle();
 
     if (nativeWindow == nullptr)
         throw std::runtime_error{"Quasar: SDL Window Handle is null"};
@@ -161,16 +161,16 @@ auto Renderer::createSurface() -> void {
 
 auto Renderer::createPhysicalDevice() -> void {
     try {
-        auto devices = instance_.enumeratePhysicalDevices();
+        auto devices = this->instance_.enumeratePhysicalDevices();
 
         if (devices.empty())
             throw std::runtime_error{"Quasar: No Vulkan-Compatible physical devices found."};
 
         // Simple device selection for now
         // TODO: Once logical device is done, implement more complex scoring
-        physicalDevice_ = std::move(devices.front());
+        this->physicalDevice_ = std::move(devices.front());
 
-        const auto props = physicalDevice_.getProperties();
+        const auto props = this->physicalDevice_.getProperties();
         const auto msg =
             std::format("Selected physical device: {}", std::string_view{props.deviceName});
         ::output(msg, ::LogLevel::Info);
@@ -182,51 +182,52 @@ auto Renderer::createPhysicalDevice() -> void {
 
 auto Renderer::createQueueFamilies() -> void {
     try {
-        const auto families = physicalDevice_.getQueueFamilyProperties();
+        const auto families = this->physicalDevice_.getQueueFamilyProperties();
         QueueFamilyIndices indices{};
 
-        for (qsr::usize i = 0; i < families.size(); ++i) {
-            const auto& family = families[i];
-            const auto index = static_cast<qsr::u32>(i);
+        for (qsr::u32 i = 0; i < families.size(); ++i) {
+            const auto flags = families[i].queueFlags;
 
-            if (family.queueCount == 0)
-                continue;
-
-            const bool supportsGraphics =
-                (family.queueFlags & vk::QueueFlagBits::eGraphics) != vk::QueueFlags{};
-
-            const bool supportsPresentation =
-                physicalDevice_.getSurfaceSupportKHR(index, *surface_);
-
-            // Prefer a family with both available
-            if (supportsGraphics && supportsPresentation) {
-                indices.graphics = index;
-                indices.presentation = index;
-                break;
+            if (this->physicalDevice_.getSurfaceSupportKHR(i, *this->surface_) == true) {
+                indices.present = i;
             }
 
-            // Otherwise, find first suitable family for each
-            if (supportsGraphics && !indices.graphics)
-                indices.graphics = index;
+            if (flags & vk::QueueFlagBits::eGraphics)
+                indices.graphics = i;
 
-            if (supportsPresentation && !indices.presentation)
-                indices.presentation = index;
+            if (flags & vk::QueueFlagBits::eCompute)
+                if (!this->queueFamilyIndices_.compute || !(flags & vk::QueueFlagBits::eGraphics)) {
+                    indices.compute = i;
+                }
+
+            if (flags & vk::QueueFlagBits::eTransfer) {
+                if (!this->queueFamilyIndices_.transfer ||
+                    (!(flags & vk::QueueFlagBits::eGraphics) &&
+                     !(flags & vk::QueueFlagBits::eCompute))) {
+                    indices.transfer = i;
+                }
+            }
         }
-        if (!indices.isComplete())
-            throw std::runtime_error{
-                "Quasar: No suitable graphics and presentation queue families were found."};
-
-        if (*indices.graphics == *indices.presentation) {
-            ::output(std::format("Using queue family {} for graphics and presentation",
-                                 *indices.graphics),
+        if (!indices.graphics)
+            throw std::runtime_error{"Quasar: No graphics queue family found"};
+        ::output(std::format("Using queue family: {} for graphics", indices.graphics.value()),
+                 ::LogLevel::Info);
+        if (!indices.compute)
+            throw std::runtime_error{"Quasar: No compute queue family found"};
+        ::output(std::format("Using queue family: {} for compute", indices.compute.value()),
+                 ::LogLevel::Info);
+        if (!indices.present)
+            throw std::runtime_error{"Quasar: No present queue family found"};
+        ::output(std::format("Using queue family: {} for presentation", indices.present.value()),
+                 ::LogLevel::Info);
+        // The transfer queue isn't necessary
+        if (!indices.transfer)
+            ::output("No transfer queue family", ::LogLevel::Warn);
+        else
+            ::output(std::format("Using queue family: {} for transfer", indices.transfer.value()),
                      ::LogLevel::Info);
-        } else {
-            ::output(std::format("Graphics queue family: {}", *indices.graphics), ::LogLevel::Info);
-            ::output(std::format("Presentation queue family: {}", *indices.presentation),
-                     ::LogLevel::Info);
-        }
 
-        queueFamilyIndices_ = indices;
+        this->queueFamilyIndices_ = indices;
     } catch (const vk::SystemError& e) {
         std::throw_with_nested(
             std::runtime_error{std::format("Quasar: Queue family creation failed: {}", e.what())});
@@ -236,17 +237,15 @@ auto Renderer::createQueueFamilies() -> void {
 auto Renderer::createLogicalDevice() -> void {
     auto start = std::chrono::steady_clock::now();
 
-    const auto indices = queueFamilyIndices_;
-
-    if (!queueFamilyIndices_.isComplete()) {
+    if (!queueFamilyIndices_.isComplete())
         throw std::runtime_error{
             "Quasar: Logical device creation failed. Incomplete queue families"};
-    }
 
-    constexpr auto queuePriority = 1.0F;
+    constexpr auto queuePriority = 1.0f;
 
     // Deduplicate queue families if they're both the same
-    const std::set<qsr::u32> uniqueFamilies{indices.graphics.value(), indices.presentation.value()};
+    const std::set<qsr::u32> uniqueFamilies{this->queueFamilyIndices_.graphics.value(),
+                                            this->queueFamilyIndices_.present.value()};
 
     std::vector<vk::DeviceQueueCreateInfo> queueCIs{};
     queueCIs.reserve(uniqueFamilies.size());
@@ -269,6 +268,7 @@ auto Renderer::createLogicalDevice() -> void {
     vk12Features.descriptorBindingVariableDescriptorCount = true;
     vk12Features.runtimeDescriptorArray = true;
     vk12Features.bufferDeviceAddress = true;
+    vk12Features.timelineSemaphore = true;
 
     vk::PhysicalDeviceVulkan13Features vk13Features{};
     vk13Features.pNext = &vk12Features;
@@ -286,11 +286,13 @@ auto Renderer::createLogicalDevice() -> void {
     deviceCI.ppEnabledExtensionNames = deviceExtensions.data();
     deviceCI.pEnabledFeatures = &vk10Features;
 
-    device_ = vk::raii::Device{physicalDevice_, deviceCI};
+    this->device_ = vk::raii::Device{this->physicalDevice_, deviceCI};
 
     // Retrieve queues
-    graphicsQueue_ = vk::raii::Queue{device_, indices.graphics.value(), 0};
-    presentQueue_ = vk::raii::Queue{device_, indices.presentation.value(), 0};
+    this->graphicsQueue_ =
+        vk::raii::Queue{this->device_, this->queueFamilyIndices_.graphics.value(), 0};
+    this->computeQueue_ =
+        vk::raii::Queue{this->device_, this->queueFamilyIndices_.present.value(), 0};
 
     auto end = std::chrono::steady_clock::now();
     const auto msg =

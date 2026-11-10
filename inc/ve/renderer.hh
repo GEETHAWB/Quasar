@@ -1,21 +1,16 @@
 #pragma once
 
-#include "../window.hh"
-#include "types.hh"
+#include "depth.hh"
+#include "queue.hh"
+#include "sync/swapchain.hh"
+#include "ve/sync/command.hh"
+#include "ve/sync/semaphore.hh"
+#include "vma.hh"
+#include "window.hh"
 
 #include <vulkan/vulkan_raii.hpp>
 
 namespace qsr::ve {
-
-struct QueueFamilyIndices final {
-    std::optional<qsr::u32> graphics;
-    std::optional<qsr::u32> presentation;
-
-    [[nodiscard]] inline constexpr auto isComplete() const noexcept -> bool {
-        return graphics.has_value() && presentation.has_value();
-    }
-};
-
 class Renderer final {
 public:
     explicit Renderer(sdl::Window& window) : window_{window} {
@@ -31,7 +26,13 @@ private:
     auto createQueueFamilies() -> void;
     auto createDebugMessenger() -> void;
     auto createLogicalDevice() -> void;
+    auto createSwapchain() -> void;
+    auto createAllocator() -> void;
+    auto createDepthAttachment() -> void;
+    auto createSemaphoreContext() -> void;
+    auto createCommandObjects() -> void;
 
+    qsr::u32 apiVersion_;
     const sdl::Window& window_;
     vk::raii::Context context_;
     vk::raii::Instance instance_{nullptr};
@@ -39,11 +40,15 @@ private:
     vk::raii::SurfaceKHR surface_{nullptr};
     vk::raii::PhysicalDevice physicalDevice_{nullptr};
     vk::raii::Device device_{nullptr};
-
+    QSwapchain swapchain_{};
+    VmaAllocatorOwner allocator_{};
     vk::raii::Queue graphicsQueue_{nullptr};
-    vk::raii::Queue presentQueue_{nullptr};
-
+    vk::raii::Queue computeQueue_{nullptr};
+    QDepthAttachment depthAttachment_{};
+    QSemaphoreContext semaphoreContext_{};
+    QCommandContext commandContext_{};
     QueueFamilyIndices queueFamilyIndices_{};
+    qsr::u32 currentFrame_{0};
 };
 
 }; // namespace qsr::ve

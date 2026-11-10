@@ -47,7 +47,7 @@ auto Renderer::createDebugMessenger() -> void {
 
     debugCI.pfnUserCallback = &debugCallback;
 
-    debugMessenger_ = vk::raii::DebugUtilsMessengerEXT{instance_, debugCI};
+    this->debugMessenger_ = vk::raii::DebugUtilsMessengerEXT{this->instance_, debugCI};
     ::output("Created debug messenger", ::LogLevel::Info);
 }
 #else
